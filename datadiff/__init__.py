@@ -20,7 +20,7 @@ import sys
 try:
     from numbers import Number
 except ImportError:
-    Number = (complex, int, long, float)
+    Number = (complex, int, eval('long'), float)
 
 from .version import __version_info__, __version__
 
@@ -30,7 +30,7 @@ PY2 = sys.version_info < (3,)
 
 string_types = str,
 if PY2:
-    string_types = basestring,
+    string_types = eval('basestring'),
 
 """
 For each type, we need:
