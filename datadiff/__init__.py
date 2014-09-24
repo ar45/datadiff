@@ -26,6 +26,11 @@ from .version import __version_info__, __version__
 
 log = logging.getLogger('datadiff')
 
+PY2 = sys.version_info < (3,)
+
+string_types = str,
+if PY2:
+    string_types = basestring,
 
 """
 For each type, we need:
@@ -53,7 +58,7 @@ def unified_diff_strings(a, b, fromfile='', tofile='', fromfiledate='', tofileda
                                   lineterm=''))
 
 def diff(a, b, context=3, depth=0, fromfile='a', tofile='b'):
-    if isinstance(a, basestring) and isinstance(b, basestring):
+    if isinstance(a, string_types) and isinstance(b, string_types):
         # special cases
         if '\n' in a or '\n' in b:
             return unified_diff_strings(a, b, fromfile=fromfile, tofile=tofile, context=context)
@@ -289,8 +294,7 @@ def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b'):
             return 0
         key = dictitem[0][0]
         # use hash, to make sure its always orderable against other potential key types
-        basestring = basestring if sys.version[0] == 2 else str
-        if isinstance(key, basestring) or isinstance(key, Number):
+        if isinstance(key, string_types) or isinstance(key, Number):
             return key
         else:
             return abs(hash(key)) # abs for consistency between py2/3, at least for datetime
