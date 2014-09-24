@@ -17,11 +17,9 @@ limitations under the License.
 import logging
 from difflib import SequenceMatcher, unified_diff
 import sys
-import os
 try:
     from numbers import Number
 except ImportError:
-    import types
     Number = (complex, int, long, float)
 
 from .version import __version_info__, __version__
