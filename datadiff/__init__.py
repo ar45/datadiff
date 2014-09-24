@@ -20,7 +20,7 @@ import sys
 try:
     from numbers import Number
 except ImportError:
-    Number = (complex, int, eval('long'), float)
+    Number = complex, int, eval('long'), float
 
 from .version import __version_info__, __version__
 
