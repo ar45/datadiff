@@ -27,7 +27,6 @@ from .version import __version_info__, __version__
 log = logging.getLogger('datadiff')
 
 
-
 """
 For each type, we need:
 * a diff()
