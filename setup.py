@@ -78,14 +78,12 @@ limitations under the License.
 
 '''
 
-from distutils.core import setup
-from setuptools import find_packages
-import setuptools # for extra commands
+import setuptools
 
 exec(open('datadiff/version.py').read())
-setup(
+params = dict(
     name = 'datadiff',
-    packages = find_packages(),
+    packages = setuptools.find_packages(),
     version = __version__,
     description = 'DataDiff is a library to provide human-readable diffs of python data structures.',
     long_description = __doc__,
@@ -105,3 +103,6 @@ setup(
     ],
     license = 'Apache License',
 )
+
+if __name__ == '__main__':
+	setuptools.setup(**params)
