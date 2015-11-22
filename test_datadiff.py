@@ -61,7 +61,7 @@ def test_diff_multiline_strings():
 def test_diff_unicode_vs_str():
     if six.PY3:
         raise SkipTest("Unicode and bytes are different types")
-    d = diff(u'abc\ndef\nghi', b'abc\nghi', fromfile="x", tofile="y")
+    d = diff(six.u('abc\ndef\nghi'), b'abc\nghi', fromfile="x", tofile="y")
     # accommodate python 2.6 having trailing spaces after --- and +++ lines
     d = '\n'.join(line.rstrip() for line in d.split('\n'))
     expected = dedent('''\
