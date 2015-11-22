@@ -1,7 +1,6 @@
 from textwrap import dedent
 from datetime import datetime
 import sys
-import re
 
 import six
 from nose.tools import assert_raises, assert_equal, raises
