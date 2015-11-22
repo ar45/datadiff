@@ -1,3 +1,5 @@
+import re
+import itertools
 from textwrap import dedent
 from datetime import datetime
 import sys
@@ -227,7 +229,8 @@ def test_diff_dict():
     a = dict(zero=0,   one=1, two=2, three=3,         nine=9, ten=10)
     b = dict(zero='@', one=1,        three=3, four=4, nine=9, ten=10)
     d = diff(a, b, fromfile="x", tofile="y")
-    expected = dedent('''\
+    # result should look something like this:
+    dedent('''\
         --- x
         +++ y
         {
@@ -240,7 +243,24 @@ def test_diff_dict():
         +'zero': '@',
         @@  @@
         }''')
-    assert_equal(str(d), expected)
+    # but due to arbitrary key ordering, may differ in the
+    # context.
+    diff_str = str(d)
+    assert "+'four': 4," in diff_str
+    assert "-'two': 2," in diff_str
+    assert "-'zero': 0," in diff_str
+    assert "+'zero': '@'," in diff_str
+    context_pattern = "^ '\w+': \d+,$"
+    assert_equal(_count_lines(context_pattern, diff_str), 3)
+
+def _count_lines(pattern, str):
+    """
+    Count the number of lines that match pattern
+    """
+    context_lines = re.finditer(pattern, str, re.M)
+    counter = itertools.count()
+    list(zip(context_lines, counter))
+    return next(counter)
 
 def test_diff_dict_keytypes():
     a = {}
