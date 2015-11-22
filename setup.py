@@ -102,10 +102,10 @@ params = dict(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     install_requires=[
-        'six',
     ],
     tests_require=[
         'nose',
+        'six',
     ],
     license = 'Apache License',
 )
