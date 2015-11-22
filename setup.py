@@ -12,7 +12,7 @@ It has special-case handling for multi-line strings, showing them as a typical u
 Drop-in replacements for some nose assertions are available.  If the assertion fails,
 a nice data diff is shown, letting you easily pinpoint the root difference.
 
-``datadiff`` works on Python 2.5 through Python 3.
+``datadiff`` works on Python 2.6 through Python 3.
 
 DataDiff project homepage: http://sourceforge.net/projects/datadiff/
 
