@@ -101,6 +101,9 @@ params = dict(
         'Operating System :: OS Independent',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
+    install_requires=[
+        'six',
+    ],
     tests_require=[
         'nose',
     ],
