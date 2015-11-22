@@ -3,9 +3,19 @@ from datetime import datetime
 import sys
 import re
 
+import six
 from nose.tools import assert_raises, assert_equal, raises
 
 from datadiff import diff, DataDiff, NotHashable, DiffNotImplementedForType, DiffTypeError
+
+
+try:
+    from unittest.case import SkipTest
+except ImportError:
+    class SkipTest(Exception):
+        pass
+
+
 
 # support 3.0/2.7 set literals, and <2.7
 set_start, set_end = repr(set([0])).split('0')
@@ -48,6 +58,8 @@ def test_diff_multiline_strings():
     assert_equal(str(d), expected)
 
 def test_diff_unicode_vs_str():
+    if six.PY3:
+        raise SkipTest("Unicode and bytes are different types")
     d = diff(u'abc\ndef\nghi', b'abc\nghi', fromfile="x", tofile="y")
     # accommodate python 2.6 having trailing spaces after --- and +++ lines
     d = '\n'.join(line.rstrip() for line in d.split('\n'))
