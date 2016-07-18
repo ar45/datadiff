@@ -69,18 +69,18 @@ def diff(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_func=F
             # we don't want to diff char-by-char
             raise DiffNotImplementedForType(str)
     if type(a) != type(b):
-        if compare_with_func and callable(b):
-            ddiff = DataDiff(type(a), fromfile=fromfile, tofile=tofile)
+        if compare_with_func and callable(a):
+            ddiff = DataDiff(type(b), fromfile=fromfile, tofile=tofile)
             try:
-                if not b(a):
-                    ddiff.delete(b)
-                    ddiff.insert(a)
+                if not a(b):
+                    ddiff.delete(a)
+                    ddiff.insert(b)
                 else:
-                    ddiff.equal(a)
+                    ddiff.equal(b)
                 return ddiff
             except Exception as e:
                 ddiff.delete(e)
-                ddiff.insert(a)
+                ddiff.insert(b)
             return ddiff
         raise DiffTypeError('Types differ: %s=%s %s=%s  Values of a and b are: %r, %r' % (fromfile, tofile, type(a), type(b), a, b))
     if type(a) == dict:
@@ -183,7 +183,7 @@ class DataDiff(object):
         return self.__bool__()
 
     def __bool__(self):
-        return bool([d for d in self.diffs if d[0] != 'equal'])
+        return bool([d for d in self.diffs if d[0] not in ('equal', 'context_end_container')])
 
 
 def hashable(s):
@@ -294,22 +294,22 @@ def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_f
         if key not in b:
             ddiff.delete(dictitem((key, a[key])))
         elif a[key] != b[key]:
-            if compare_with_func and callable(b[key]):
+            if compare_with_func and callable(a[key]):
                 try:
-                    if b[key](a[key]):
+                    if a[key](b[key]):
                         add_equal = True
                     else:
                         ddiff.delete(dictitem((key, a[key])))
                         ddiff.insert(dictitem((key, b[key])))
                 except Exception as e:
-                    ddiff.delete(dictitem((key, a[key])))
-                    ddiff.insert(dictitem((key, e)))
+                    ddiff.delete(dictitem((key, e)))
+                    ddiff.insert(dictitem((key, b[key])))
             else:
                 try:
                     nested_diff = diff(a[key], b[key], context, depth+1, compare_with_func=compare_with_func)
                     nested_item = dictitem((key, nested_diff))
                     nested_item.depth = depth+1
-                    ddiff.nested(nested_item) # not really equal
+                    ddiff.equal(nested_item) # not really equal
                 except DiffTypeError:
                     ddiff.delete(dictitem((key, a[key])))
                     ddiff.insert(dictitem((key, b[key])))
@@ -318,7 +318,7 @@ def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_f
 
         if add_equal:
             if context:
-                ddiff.equal(dictitem((key, a[key])))
+                ddiff.equal(dictitem((key, b[key])))
             context -= 1
 
     for key in b:
