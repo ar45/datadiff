@@ -48,6 +48,7 @@ class DiffNotImplementedForType(DiffTypeError):
     def __str__(self):
         return "diff() not implemented for %s" % self.attempted_type
 
+
 def unified_diff_strings(a, b, fromfile='', tofile='', fromfiledate='', tofiledate='', context=3):
     """
     Wrapper around difflib.unified_diff that accepts 'a' and 'b' as multi-line strings
@@ -57,7 +58,8 @@ def unified_diff_strings(a, b, fromfile='', tofile='', fromfiledate='', tofileda
                                   fromfile, tofile, fromfiledate, tofiledate, context,
                                   lineterm=''))
 
-def diff(a, b, context=3, depth=0, fromfile='a', tofile='b'):
+
+def diff(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_func=False):
     if isinstance(a, string_types) and isinstance(b, string_types):
         # special cases
         if '\n' in a or '\n' in b:
@@ -67,15 +69,29 @@ def diff(a, b, context=3, depth=0, fromfile='a', tofile='b'):
             # we don't want to diff char-by-char
             raise DiffNotImplementedForType(str)
     if type(a) != type(b):
+        if compare_with_func and callable(b):
+            ddiff = DataDiff(type(a), fromfile=fromfile, tofile=tofile)
+            try:
+                if not b(a):
+                    ddiff.delete(b)
+                    ddiff.insert(a)
+                else:
+                    ddiff.equal(a)
+                return ddiff
+            except Exception as e:
+                ddiff.delete(e)
+                ddiff.insert(a)
+            return ddiff
         raise DiffTypeError('Types differ: %s=%s %s=%s  Values of a and b are: %r, %r' % (fromfile, tofile, type(a), type(b), a, b))
     if type(a) == dict:
-        return diff_dict(a, b, context, depth, fromfile=fromfile, tofile=tofile)
+        return diff_dict(a, b, context, depth, fromfile=fromfile, tofile=tofile, compare_with_func=compare_with_func)
     if hasattr(a, 'intersection') and hasattr(a, 'difference'):
         return diff_set(a, b, context, depth, fromfile=fromfile, tofile=tofile)
     try:
-        return try_diff_seq(a, b, context, depth, fromfile=fromfile, tofile=tofile)
+        return try_diff_seq(a, b, context, depth, fromfile=fromfile, tofile=tofile, compare_with_func=compare_with_func)
     except NotSequence:
         raise DiffNotImplementedForType(type(a))
+
 
 class DataDiff(object):
 
@@ -169,6 +185,7 @@ class DataDiff(object):
     def __bool__(self):
         return bool([d for d in self.diffs if d[0] != 'equal'])
 
+
 def hashable(s):
     try:
         # convert top-level container
@@ -193,25 +210,27 @@ def hashable(s):
     else:
         return ret
 
-def try_diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b'):
+
+def try_diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_func=False):
     """
     Safe to try any containers with this function, to see if it might be a sequence
     Raises TypeError if its not a sequence
     """
     try:
-        return diff_seq(a, b, context, depth, fromfile=fromfile, tofile=tofile)
+        return diff_seq(a, b, context, depth, fromfile=fromfile, tofile=tofile, compare_with_func=compare_with_func)
     except NotHashable:
         raise
     except:
         log.debug('tried SequenceMatcher but got error', exc_info=True)
         raise NotSequence("Cannot use SequenceMatcher on %s" % type(a))
 
-def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b'):
+
+def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_func=False):
     if not hasattr(a, '__iter__') and not hasattr(a, '__getitem__'):
         raise NotSequence("Not a sequence %s" % type(a))
     hashable_a = [hashable(_) for _ in a]
     hashable_b = [hashable(_) for _ in b]
-    sm = SequenceMatcher(a = hashable_a, b = hashable_b)
+    sm = SequenceMatcher(a=hashable_a, b=hashable_b)
     if type(a) == tuple:
         ddiff = DataDiff(tuple, '(', ')', fromfile=fromfile, tofile=tofile)
     elif type(b) == list:
@@ -219,15 +238,15 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b'):
     else:
         ddiff = DataDiff(type(a), fromfile=fromfile, tofile=tofile)
     for chunk in sm.get_grouped_opcodes(context):
-        ddiff.context(max(chunk[0][1]-1,0), max(chunk[-1][2]-1, 0),
-                     max(chunk[0][3]-1,0), max(chunk[-1][4]-1, 0))
+        ddiff.context(max(chunk[0][1]-1, 0), max(chunk[-1][2]-1, 0),
+                      max(chunk[0][3]-1, 0), max(chunk[-1][4]-1, 0))
         for change, i1, i2, j1, j2 in chunk:
             if change == 'replace':
                 consecutive_deletes = []
                 consecutive_inserts = []
                 for a2, b2 in zip(a[i1:i2], b[j1:j2]):
                     try:
-                        nested_diff = diff(a2, b2, context, depth+1)
+                        nested_diff = diff(a2, b2, context, depth+1, compare_with_func=compare_with_func)
                         ddiff.delete_multi(consecutive_deletes)
                         ddiff.insert_multi(consecutive_inserts)
                         consecutive_deletes = []
@@ -266,24 +285,42 @@ class dictitem(tuple):
             return "%r: %s" % (key, diff_val.strip())
         return "%r: %r" % (key, val)
 
-def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b'):
+
+def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_func=False):
     ddiff = DataDiff(dict, '{', '}', fromfile=fromfile, tofile=tofile)
     for key in a.keys():
+        add_equal = False
+
         if key not in b:
             ddiff.delete(dictitem((key, a[key])))
         elif a[key] != b[key]:
-            try:
-                nested_diff = diff(a[key], b[key], context, depth+1)
-                nested_item = dictitem((key, nested_diff))
-                nested_item.depth = depth+1
-                ddiff.equal(nested_item) # not really equal
-            except DiffTypeError:
-                ddiff.delete(dictitem((key, a[key])))
-                ddiff.insert(dictitem((key, b[key])))
+            if compare_with_func and callable(b[key]):
+                try:
+                    if b[key](a[key]):
+                        add_equal = True
+                    else:
+                        ddiff.delete(dictitem((key, a[key])))
+                        ddiff.insert(dictitem((key, b[key])))
+                except Exception as e:
+                    ddiff.delete(dictitem((key, a[key])))
+                    ddiff.insert(dictitem((key, e)))
+            else:
+                try:
+                    nested_diff = diff(a[key], b[key], context, depth+1, compare_with_func=compare_with_func)
+                    nested_item = dictitem((key, nested_diff))
+                    nested_item.depth = depth+1
+                    ddiff.nested(nested_item) # not really equal
+                except DiffTypeError:
+                    ddiff.delete(dictitem((key, a[key])))
+                    ddiff.insert(dictitem((key, b[key])))
         else:
+            add_equal = True
+
+        if add_equal:
             if context:
                 ddiff.equal(dictitem((key, a[key])))
             context -= 1
+
     for key in b:
         if key not in a:
             ddiff.insert(dictitem((key, b[key])))
@@ -304,6 +341,7 @@ def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b'):
         ddiff.context_end_container()
 
     return ddiff
+
 
 def diff_set(a, b, context=3, depth=0, fromfile='b', tofile='a'):
     ddiff = DataDiff(type(a), fromfile=fromfile, tofile=tofile)
