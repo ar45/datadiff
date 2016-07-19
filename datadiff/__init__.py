@@ -225,6 +225,10 @@ def try_diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_wit
         raise NotSequence("Cannot use SequenceMatcher on %s" % type(a))
 
 
+def compares_with_func(a, b):
+    return callable(a) and a(b)
+
+
 def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_func=False):
     if not hasattr(a, '__iter__') and not hasattr(a, '__getitem__'):
         raise NotSequence("Not a sequence %s" % type(a))
@@ -238,15 +242,19 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_fu
     else:
         ddiff = DataDiff(type(a), fromfile=fromfile, tofile=tofile)
     for chunk in sm.get_grouped_opcodes(context):
-        ddiff.context(max(chunk[0][1]-1, 0), max(chunk[-1][2]-1, 0),
-                      max(chunk[0][3]-1, 0), max(chunk[-1][4]-1, 0))
+        realy_diffs = compare_with_func is False
         for change, i1, i2, j1, j2 in chunk:
             if change == 'replace':
                 consecutive_deletes = []
                 consecutive_inserts = []
                 for a2, b2 in zip(a[i1:i2], b[j1:j2]):
+                    if compares_with_func(a2, b2):
+                        continue
                     try:
                         nested_diff = diff(a2, b2, context, depth+1, compare_with_func=compare_with_func)
+                        # so this is a special case where the  elemnets compare equal with the func
+                        if not nested_diff:
+                            continue
                         ddiff.delete_multi(consecutive_deletes)
                         ddiff.insert_multi(consecutive_inserts)
                         consecutive_deletes = []
@@ -256,13 +264,16 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_fu
                         consecutive_deletes.append(a2)
                         consecutive_inserts.append(b2)
 
+                    realy_diffs = True
+
                 # differing lengths get truncated by zip()
                 # here we handle the truncated items
-                ddiff.delete_multi(consecutive_deletes)
+                if realy_diffs:
+                    ddiff.delete_multi(consecutive_deletes)
+                    ddiff.insert_multi(consecutive_inserts)
                 if i2-i1 > j2-j1:
                     common_length = j2-j1 # covered by zip
                     ddiff.delete_multi(a[i1+common_length:i2])
-                ddiff.insert_multi(consecutive_inserts)
                 if i2-i1 < j2-j1:
                     common_length = i2-i1 # covered by zip
                     ddiff.insert_multi(b[j1+common_length:j2])
@@ -272,6 +283,9 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_fu
                 else:
                     items = a[i1:i2]
                 ddiff.multi(change, items)
+        if realy_diffs:
+            ddiff.context(max(chunk[0][1] - 1, 0), max(chunk[-1][2] - 1, 0),
+                          max(chunk[0][3] - 1, 0), max(chunk[-1][4] - 1, 0))
         if i2 < len(a):
             ddiff.context_end_container()
     return ddiff
