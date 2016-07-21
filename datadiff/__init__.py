@@ -164,7 +164,10 @@ class DataDiff(object):
                 output.append(' '*depth + '@@  @@')
                 continue
             elif change == 'datadiff':
-                output.append(' '*depth + items.stringify(depth+1) + ',')
+                try:
+                    output.append(' '*depth + items.stringify(depth+1) + ',')
+                except AttributeError:
+                    output.append(' ' * depth + "%s%r," % (' ', items))
                 continue
             if change == 'delete':
                 ch = '-'
@@ -323,7 +326,7 @@ def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_f
                     nested_diff = diff(a[key], b[key], context, depth+1, compare_with_func=compare_with_func)
                     nested_item = dictitem((key, nested_diff))
                     nested_item.depth = depth+1
-                    ddiff.equal(nested_item) # not really equal
+                    ddiff.nested(nested_item) # not really equal
                 except DiffTypeError:
                     ddiff.delete(dictitem((key, a[key])))
                     ddiff.insert(dictitem((key, b[key])))
