@@ -478,3 +478,87 @@ def test_nested_unhashable2():
          },
         ]''')
     assert_equal(str(d), expected)
+
+
+def test_list_compare_with_func():
+    a = [1, 2, 3, lambda v: True]
+    b = [1, 2, 3, 'abc']
+    d = diff(a, b, fromfile="x", tofile="y", compare_with_func=True)
+    assert_equal(str(d), '')
+
+
+def test_nested_unhashable_compare_with_func_equal():
+    # dict is unhashable, and nested in another dict compares with func
+    a = [dict(foo = dict(user_id=lambda v: True, mount_point='Wiki'))]
+    b = [dict(foo = dict(user_id='badf00d', mount_point='Wiki'))]
+    d = diff(a, b, fromfile="x", tofile="y", compare_with_func=True)
+    assert_equal(str(d), '')
+
+
+def true(v):
+    return True
+
+
+def false(v):
+    return False
+
+
+def test_nested_unhashable_compare_with_func_diff():
+    a = [1, 2, 3, dict(foo = dict(user_id=false, mount_point='Wiki'), bar = true), 6, 7, 8, 'diff', 9]
+    b = [1, 2, 3, dict(foo = dict(user_id='badf00d', mount_point='Wiki'), bar = 'qaz'), 6, 7, 8, 9]
+    d = diff(a, b, fromfile="x", tofile="y", compare_with_func=True)
+    expected = dedent('''\
+        --- x
+        +++ y
+        [
+        @@ -0,8 +0,7 @@
+         1,
+         2,
+         3,
+         {
+          'bar': 'qaz',
+          'foo': {
+           'mount_point': 'Wiki',
+          -'user_id': %r,
+          +'user_id': 'badf00d',
+          },
+         },
+         6,
+         7,
+         8,
+        -'diff',
+         9,
+        ]''') % (false,)
+    assert_equal(str(d), expected)
+
+
+def test_nested_unhashable_compare_with_func_diff2():
+    a = [1, 2, 3, (dict(foo = dict(user_id=false, mount_point='Wiki'), bar = true), 6, 7, 8, 'diff', 9)]
+    b = [1, 2, 3, (dict(foo = dict(user_id='badf00d', mount_point='Wiki'), bar = 'qaz'), 6, 7, 8, 9)]
+    d = diff(a, b, fromfile="x", tofile="y", compare_with_func=True)
+    expected = dedent('''\
+        --- x
+        +++ y
+        [
+        @@ -0,3 +0,3 @@
+         1,
+         2,
+         3,
+         (
+         @@ -0,5 +0,4 @@
+           {
+           'bar': 'qaz',
+           'foo': {
+            'mount_point': 'Wiki',
+           -'user_id': %r,
+           +'user_id': 'badf00d',
+           },
+          },
+          6,
+          7,
+          8,
+         -'diff',
+          9,
+         ),
+        ]''') % (false,)
+    assert_equal(str(d), expected)

@@ -109,6 +109,9 @@ class DataDiff(object):
             self.type_start_str = type_start_str
             self.type_end_str = type_end_str
 
+    def clone(self):
+        return type(self)(self.datatype, self.type_start_str, self.type_end_str, self.fromfile, self.tofile)
+
     def context(self, a_start, a_end, b_start, b_end):
         self.diffs.append(('context', [a_start, a_end, b_start, b_end]))
 
@@ -186,7 +189,7 @@ class DataDiff(object):
         return self.__bool__()
 
     def __bool__(self):
-        return bool([d for d in self.diffs if d[0] not in ('equal', 'context_end_container')])
+        return bool([d for d in self.diffs if d[0] not in ('equal', 'context_end_container', 'context')])
 
 
 def hashable(s):
@@ -245,6 +248,9 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_fu
     else:
         ddiff = DataDiff(type(a), fromfile=fromfile, tofile=tofile)
     for chunk in sm.get_grouped_opcodes(context):
+        chunk_ddiff = ddiff.clone()
+        chunk_ddiff.context(max(chunk[0][1] - 1, 0), max(chunk[-1][2] - 1, 0),
+                      max(chunk[0][3] - 1, 0), max(chunk[-1][4] - 1, 0))
         realy_diffs = compare_with_func is False
         for change, i1, i2, j1, j2 in chunk:
             if change == 'replace':
@@ -258,11 +264,11 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_fu
                         # so this is a special case where the  elemnets compare equal with the func
                         if not nested_diff:
                             continue
-                        ddiff.delete_multi(consecutive_deletes)
-                        ddiff.insert_multi(consecutive_inserts)
+                        chunk_ddiff.delete_multi(consecutive_deletes)
+                        chunk_ddiff.insert_multi(consecutive_inserts)
                         consecutive_deletes = []
                         consecutive_inserts = []
-                        ddiff.nested(nested_diff)
+                        chunk_ddiff.nested(nested_diff)
                     except DiffTypeError:
                         consecutive_deletes.append(a2)
                         consecutive_inserts.append(b2)
@@ -271,26 +277,24 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_fu
 
                 # differing lengths get truncated by zip()
                 # here we handle the truncated items
-                if realy_diffs:
-                    ddiff.delete_multi(consecutive_deletes)
-                    ddiff.insert_multi(consecutive_inserts)
+                chunk_ddiff.delete_multi(consecutive_deletes)
                 if i2-i1 > j2-j1:
                     common_length = j2-j1 # covered by zip
-                    ddiff.delete_multi(a[i1+common_length:i2])
+                    chunk_ddiff.delete_multi(a[i1+common_length:i2])
+                chunk_ddiff.insert_multi(consecutive_inserts)
                 if i2-i1 < j2-j1:
                     common_length = i2-i1 # covered by zip
-                    ddiff.insert_multi(b[j1+common_length:j2])
+                    chunk_ddiff.insert_multi(b[j1+common_length:j2])
             else:
                 if change == 'insert':
                     items = b[j1:j2]
                 else:
                     items = a[i1:i2]
-                ddiff.multi(change, items)
-        if realy_diffs:
-            ddiff.context(max(chunk[0][1] - 1, 0), max(chunk[-1][2] - 1, 0),
-                          max(chunk[0][3] - 1, 0), max(chunk[-1][4] - 1, 0))
+                chunk_ddiff.multi(change, items)
         if i2 < len(a):
-            ddiff.context_end_container()
+            chunk_ddiff.context_end_container()
+        if realy_diffs:
+            ddiff.diffs.extend(chunk_ddiff.diffs)
     return ddiff
 
 
@@ -324,9 +328,12 @@ def diff_dict(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_f
             else:
                 try:
                     nested_diff = diff(a[key], b[key], context, depth+1, compare_with_func=compare_with_func)
-                    nested_item = dictitem((key, nested_diff))
-                    nested_item.depth = depth+1
-                    ddiff.nested(nested_item) # not really equal
+                    if not nested_diff:
+                        add_equal = True
+                    else:
+                        nested_item = dictitem((key, nested_diff))
+                        nested_item.depth = depth+1
+                        ddiff.nested(nested_item)
                 except DiffTypeError:
                     ddiff.delete(dictitem((key, a[key])))
                     ddiff.insert(dictitem((key, b[key])))
