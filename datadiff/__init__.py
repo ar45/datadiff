@@ -290,7 +290,10 @@ def diff_seq(a, b, context=3, depth=0, fromfile='a', tofile='b', compare_with_fu
                     items = b[j1:j2]
                 else:
                     items = a[i1:i2]
+                if change != 'equal':
+                    realy_diffs = True
                 chunk_ddiff.multi(change, items)
+
         if i2 < len(a):
             chunk_ddiff.context_end_container()
         if realy_diffs:

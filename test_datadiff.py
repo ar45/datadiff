@@ -562,3 +562,31 @@ def test_nested_unhashable_compare_with_func_diff2():
          ),
         ]''') % (false,)
     assert_equal(str(d), expected)
+
+
+def test_seq_compare_with_func_diff():
+    a = []
+    b = [1]
+    d = diff(a, b, fromfile="x", tofile="y", compare_with_func=True)
+    expected = dedent('''\
+        --- x
+        +++ y
+        [
+        @@ -0 +0 @@
+        +1,
+        ]''')
+    assert_equal(str(d), expected)
+
+
+def test_seq_compare_with_func_diff2():
+    a = [1]
+    b = []
+    d = diff(a, b, fromfile="x", tofile="y", compare_with_func=True)
+    expected = dedent('''\
+        --- x
+        +++ y
+        [
+        @@ -0 +0 @@
+        -1,
+        ]''')
+    assert_equal(str(d), expected)
